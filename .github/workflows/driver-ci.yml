@@ -35,6 +35,18 @@ jobs:
       - name: Build driver and host
         shell: pwsh
         run: |
+          $WdkBin = Join-Path $PWD `
+              "driver\packages\Microsoft.Windows.WDK.x64.10.0.28000.1839\c\bin\10.0.28000.0"
+
+          $env:Path = @(
+              (Join-Path $WdkBin "x64"),
+              (Join-Path $WdkBin "x86"),
+              $env:Path
+          ) -join ";"
+
+          Get-Command "stampinf.exe" |
+              Select-Object -ExpandProperty Source
+
           msbuild "driver\TabletMonitor.VirtualDisplay.sln" `
               /m `
               /p:Configuration=Release `
