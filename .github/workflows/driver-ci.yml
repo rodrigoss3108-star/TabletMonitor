@@ -56,62 +56,56 @@ jobs:
               /p:SignMode=Off `
               /p:Inf2CatUseLocalTime=true
 
-      - name: Sign and assemble package
+      - name: Create driver catalog
         shell: pwsh
+        timeout-minutes: 2
         run: |
           $ErrorActionPreference = "Stop"
           $ReleaseRoot = Join-Path $PWD "driver\x64\Release"
-          $Dist = Join-Path $PWD "driver\dist"
+          $Inf = Join-Path $ReleaseRoot "TabletMonitor.VirtualDisplay.inf"
+          $Dll = Join-Path $ReleaseRoot "TabletMonitor.VirtualDisplay.dll"
+          $Catalog = Join-Path $ReleaseRoot "TabletMonitor.VirtualDisplay.cat"
           $WdkBin = Join-Path $PWD `
               "driver\packages\Microsoft.Windows.WDK.x64.10.0.28000.1839\c\bin\10.0.28000.0"
 
-          New-Item `
-              -ItemType Directory `
-              -Path $Dist `
-              -Force |
-              Out-Null
-
-          $Inf = Get-ChildItem `
-              -LiteralPath $ReleaseRoot `
-              -Filter "TabletMonitor.VirtualDisplay.inf" `
-              -File `
-              -Recurse |
-              Select-Object -First 1
-
-          if ($null -eq $Inf) {
+          if (-not (Test-Path -LiteralPath $Inf)) {
               throw "INF compilado não encontrado."
           }
 
-          $PackageDirectory = $Inf.Directory.FullName
-          $Catalog = Get-ChildItem `
-              -LiteralPath $PackageDirectory `
-              -Filter "TabletMonitor.VirtualDisplay.cat" `
-              -File `
-              -ErrorAction SilentlyContinue |
-              Select-Object -First 1
+          if (-not (Test-Path -LiteralPath $Dll)) {
+              throw "DLL do driver não encontrada."
+          }
 
-          if ($null -eq $Catalog) {
-              $Inf2Cat = Get-Item `
-                  -LiteralPath (Join-Path $WdkBin "x86\Inf2Cat.exe")
+          if (-not (Test-Path -LiteralPath $Catalog)) {
+              $Inf2Cat = Join-Path $WdkBin "x86\Inf2Cat.exe"
 
-              & $Inf2Cat.FullName `
-                  "/driver:$PackageDirectory" `
+              & $Inf2Cat `
+                  "/driver:$ReleaseRoot" `
                   "/os:10_X64"
 
               if ($LASTEXITCODE -ne 0) {
                   throw "Inf2Cat falhou com o código $LASTEXITCODE."
               }
-
-              $Catalog = Get-ChildItem `
-                  -LiteralPath $PackageDirectory `
-                  -Filter "TabletMonitor.VirtualDisplay.cat" `
-                  -File |
-                  Select-Object -First 1
           }
 
-          if ($null -eq $Catalog) {
+          if (-not (Test-Path -LiteralPath $Catalog)) {
               throw "Catálogo do driver não encontrado."
           }
+
+      - name: Sign driver catalog
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $ErrorActionPreference = "Stop"
+          $ReleaseRoot = Join-Path $PWD "driver\x64\Release"
+          $Catalog = Join-Path $ReleaseRoot "TabletMonitor.VirtualDisplay.cat"
+          $Cer = Join-Path $ReleaseRoot "TabletMonitor-Test.cer"
+          $Pfx = Join-Path $env:RUNNER_TEMP "TabletMonitor-Test.pfx"
+          $PasswordText = [Guid]::NewGuid().ToString("N")
+          $Password = ConvertTo-SecureString `
+              -String $PasswordText `
+              -AsPlainText `
+              -Force
 
           $SignToolPattern = `
               "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe"
@@ -136,15 +130,6 @@ jobs:
               -KeyExportPolicy Exportable `
               -NotAfter (Get-Date).AddYears(5)
 
-          $PasswordText = [Guid]::NewGuid().ToString("N")
-          $Password = ConvertTo-SecureString `
-              -String $PasswordText `
-              -AsPlainText `
-              -Force
-
-          $Pfx = Join-Path $env:RUNNER_TEMP "TabletMonitor-Test.pfx"
-          $Cer = Join-Path $Dist "TabletMonitor-Test.cer"
-
           Export-PfxCertificate `
               -Cert $Certificate `
               -FilePath $Pfx `
@@ -162,11 +147,29 @@ jobs:
               /fd SHA256 `
               /f $Pfx `
               /p $PasswordText `
-              $Catalog.FullName
+              $Catalog
 
           if ($LASTEXITCODE -ne 0) {
               throw "A assinatura do catálogo falhou com o código $LASTEXITCODE."
           }
+
+      - name: Verify driver signature
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $ErrorActionPreference = "Stop"
+          $ReleaseRoot = Join-Path $PWD "driver\x64\Release"
+          $Catalog = Join-Path $ReleaseRoot "TabletMonitor.VirtualDisplay.cat"
+          $Cer = Join-Path $ReleaseRoot "TabletMonitor-Test.cer"
+          $SignToolPattern = `
+              "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe"
+
+          $SignTool = Get-ChildItem `
+              -Path $SignToolPattern `
+              -File `
+              -ErrorAction SilentlyContinue |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1
 
           Import-Certificate `
               -FilePath $Cer `
@@ -182,64 +185,58 @@ jobs:
               verify `
               /v `
               /pa `
-              $Catalog.FullName
+              $Catalog
 
           if ($LASTEXITCODE -ne 0) {
               throw "A verificação da assinatura falhou com o código $LASTEXITCODE."
           }
 
-          $DriverFiles = Get-ChildItem `
-              -LiteralPath $PackageDirectory `
-              -File |
-              Where-Object {
-                  $_.Extension -in ".inf", ".cat", ".dll"
+      - name: Assemble driver package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $ReleaseRoot = Join-Path $PWD "driver\x64\Release"
+          $Dist = Join-Path $PWD "driver\dist"
+          $Pfx = Join-Path $env:RUNNER_TEMP "TabletMonitor-Test.pfx"
+
+          New-Item `
+              -ItemType Directory `
+              -Path $Dist `
+              -Force |
+              Out-Null
+
+          $PackageFiles = @(
+              (Join-Path $ReleaseRoot "TabletMonitor.VirtualDisplay.inf"),
+              (Join-Path $ReleaseRoot "TabletMonitor.VirtualDisplay.cat"),
+              (Join-Path $ReleaseRoot "TabletMonitor.VirtualDisplay.dll"),
+              (Join-Path $ReleaseRoot "TabletMonitor.VirtualDisplay.App.exe"),
+              (Join-Path $ReleaseRoot "TabletMonitor-Test.cer"),
+              (Join-Path $PWD "driver\Install-TabletMonitorVirtualDisplay.ps1"),
+              (Join-Path $PWD "driver\README.md"),
+              (Join-Path $PWD "driver\MS-PL.txt")
+          )
+
+          foreach ($PackageFile in $PackageFiles) {
+              if (-not (Test-Path -LiteralPath $PackageFile)) {
+                  throw "Arquivo do pacote não encontrado: $PackageFile"
               }
 
-          Copy-Item `
-              -LiteralPath $DriverFiles.FullName `
-              -Destination $Dist `
-              -Force
-
-          $Application = Get-ChildItem `
-              -LiteralPath $ReleaseRoot `
-              -Filter "TabletMonitor.VirtualDisplay.App.exe" `
-              -File `
-              -Recurse |
-              Select-Object -First 1
-
-          if ($null -eq $Application) {
-              throw "Aplicativo do monitor virtual não encontrado."
+              Copy-Item `
+                  -LiteralPath $PackageFile `
+                  -Destination $Dist `
+                  -Force
           }
 
-          Copy-Item `
-              -LiteralPath $Application.FullName `
-              -Destination $Dist `
-              -Force
-
-          Copy-Item `
-              -LiteralPath "driver\Install-TabletMonitorVirtualDisplay.ps1" `
-              -Destination $Dist `
-              -Force
-
-          Copy-Item `
-              -LiteralPath "driver\README.md" `
-              -Destination $Dist `
-              -Force
-
-          Copy-Item `
-              -LiteralPath "driver\MS-PL.txt" `
-              -Destination $Dist `
-              -Force
-
-          Remove-Item `
-              -LiteralPath $Pfx `
-              -Force
+          if (Test-Path -LiteralPath $Pfx) {
+              Remove-Item `
+                  -LiteralPath $Pfx `
+                  -Force
+          }
 
           Get-ChildItem `
               -LiteralPath $Dist |
               Select-Object Name, Length |
               Format-Table -AutoSize
-
       - name: Upload driver package
         uses: actions/upload-artifact@v4
         with:
