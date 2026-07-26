@@ -33,6 +33,13 @@ internal sealed class FfmpegDesktopCapture : IAsyncDisposable
         AddArgument(startInfo, "-framerate", options.FramesPerSecond.ToString());
         AddArgument(startInfo, "-draw_mouse", "1");
         AddArgument(startInfo, "-rtbufsize", "256M");
+        AddArgument(startInfo, "-offset_x", options.CaptureX.ToString());
+        AddArgument(startInfo, "-offset_y", options.CaptureY.ToString());
+        AddArgument(
+            startInfo,
+            "-video_size",
+            $"{options.CaptureWidth}x{options.CaptureHeight}"
+        );
         AddArgument(startInfo, "-i", "desktop");
         AddArgument(startInfo, "-an");
         AddArgument(
