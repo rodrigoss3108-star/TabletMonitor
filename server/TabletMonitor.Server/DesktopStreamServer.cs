@@ -15,6 +15,10 @@ internal sealed class DesktopStreamServer(ServerOptions options)
         Console.WriteLine("TabletMonitor.Server");
         Console.WriteLine($"Escutando em 0.0.0.0:{options.Port}");
         Console.WriteLine(
+            $"Captura: X={options.CaptureX}, Y={options.CaptureY}, " +
+            $"{options.CaptureWidth} × {options.CaptureHeight}"
+        );
+        Console.WriteLine(
             $"Vídeo: {options.Width} × {options.Height}, " +
             $"{options.FramesPerSecond} FPS, {options.BitrateKbps} kbps"
         );
@@ -102,4 +106,3 @@ internal sealed class DesktopStreamServer(ServerOptions options)
         }
     }
 }
-
