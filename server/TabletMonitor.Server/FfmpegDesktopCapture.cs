@@ -46,7 +46,6 @@ internal sealed class FfmpegDesktopCapture : IAsyncDisposable
         AddArgument(startInfo, "-preset", "ultrafast");
         AddArgument(startInfo, "-tune", "zerolatency");
         AddArgument(startInfo, "-profile:v", "baseline");
-        AddArgument(startInfo, "-level", "4.2");
         AddArgument(startInfo, "-pix_fmt", "yuv420p");
         AddArgument(startInfo, "-b:v", $"{options.BitrateKbps}k");
         AddArgument(startInfo, "-maxrate", $"{options.BitrateKbps}k");
@@ -138,4 +137,3 @@ internal sealed class FfmpegDesktopCapture : IAsyncDisposable
         }
     }
 }
-
