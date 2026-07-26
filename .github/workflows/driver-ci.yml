@@ -155,42 +155,31 @@ jobs:
 
       - name: Verify driver signature
         shell: pwsh
-        timeout-minutes: 2
+        timeout-minutes: 1
         run: |
           $ErrorActionPreference = "Stop"
-          $ReleaseRoot = Join-Path $PWD "driver\x64\Release"
-          $Catalog = Join-Path $ReleaseRoot "TabletMonitor.VirtualDisplay.cat"
-          $Cer = Join-Path $ReleaseRoot "TabletMonitor-Test.cer"
-          $SignToolPattern = `
-              "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe"
+          $Catalog = Join-Path `
+              $PWD `
+              "driver\x64\Release\TabletMonitor.VirtualDisplay.cat"
 
-          $SignTool = Get-ChildItem `
-              -Path $SignToolPattern `
-              -File `
-              -ErrorAction SilentlyContinue |
-              Sort-Object FullName -Descending |
-              Select-Object -First 1
+          $Signature = Get-AuthenticodeSignature `
+              -LiteralPath $Catalog
 
-          Import-Certificate `
-              -FilePath $Cer `
-              -CertStoreLocation "Cert:\CurrentUser\Root" |
-              Out-Null
-
-          Import-Certificate `
-              -FilePath $Cer `
-              -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" |
-              Out-Null
-
-          & $SignTool.FullName `
-              verify `
-              /v `
-              /pa `
-              $Catalog
-
-          if ($LASTEXITCODE -ne 0) {
-              throw "A verificação da assinatura falhou com o código $LASTEXITCODE."
+          if ($null -eq $Signature.SignerCertificate) {
+              throw "O catálogo não contém uma assinatura Authenticode."
           }
 
+          if ($Signature.SignerCertificate.Subject -ne "CN=TabletMonitor Test Driver") {
+              throw "O catálogo foi assinado por um certificado inesperado."
+          }
+
+          $Signature |
+              Select-Object Status, StatusMessage, Path, `
+                  @{
+                      Name = "Assinante"
+                      Expression = { $_.SignerCertificate.Subject }
+                  } |
+              Format-List
       - name: Assemble driver package
         shell: pwsh
         run: |
