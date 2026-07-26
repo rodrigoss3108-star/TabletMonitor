@@ -6,6 +6,10 @@ internal sealed record ServerOptions(
     int Height,
     int FramesPerSecond,
     int BitrateKbps,
+    int CaptureX,
+    int CaptureY,
+    int CaptureWidth,
+    int CaptureHeight,
     string FfmpegPath)
 {
     public static string HelpText =>
@@ -21,6 +25,10 @@ internal sealed record ServerOptions(
           --height <pixels>     Altura transmitida. Padrão: 1200
           --fps <número>        Quadros por segundo. Padrão: 30
           --bitrate <kbps>      Bitrate do H.264. Padrão: 12000
+          --capture-x <pixels>  Posição horizontal da tela capturada. Padrão: 0
+          --capture-y <pixels>  Posição vertical da tela capturada. Padrão: 0
+          --capture-width <px>  Largura da área capturada. Padrão: --width
+          --capture-height <px> Altura da área capturada. Padrão: --height
           --ffmpeg <caminho>    Caminho completo do ffmpeg.exe
           --help                Exibe esta ajuda
         """;
@@ -51,10 +59,37 @@ internal sealed record ServerOptions(
         var height = ReadInteger(values, "height", 1200, 240, 4320);
         var framesPerSecond = ReadInteger(values, "fps", 30, 1, 120);
         var bitrateKbps = ReadInteger(values, "bitrate", 12000, 500, 100000);
+        var captureX = ReadInteger(values, "capture-x", 0, -32768, 32768);
+        var captureY = ReadInteger(values, "capture-y", 0, -32768, 32768);
+        var captureWidth = ReadInteger(
+            values,
+            "capture-width",
+            width,
+            320,
+            7680
+        );
+        var captureHeight = ReadInteger(
+            values,
+            "capture-height",
+            height,
+            240,
+            4320
+        );
         var ffmpegPath = ReadString(values, "ffmpeg", "ffmpeg.exe");
 
         var supported = new HashSet<string>(
-            ["port", "width", "height", "fps", "bitrate", "ffmpeg"],
+            [
+                "port",
+                "width",
+                "height",
+                "fps",
+                "bitrate",
+                "capture-x",
+                "capture-y",
+                "capture-width",
+                "capture-height",
+                "ffmpeg"
+            ],
             StringComparer.OrdinalIgnoreCase
         );
 
@@ -71,6 +106,10 @@ internal sealed record ServerOptions(
             height,
             framesPerSecond,
             bitrateKbps,
+            captureX,
+            captureY,
+            captureWidth,
+            captureHeight,
             ffmpegPath
         );
     }
@@ -110,4 +149,3 @@ internal sealed record ServerOptions(
         return value.Trim();
     }
 }
-
