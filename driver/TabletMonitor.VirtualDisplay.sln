@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.0.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TabletMonitor.VirtualDisplay", "TabletMonitor.VirtualDisplay\TabletMonitor.VirtualDisplay.vcxproj", "{5D6C371B-90B7-42A8-9B6D-1B76F2E1984A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TabletMonitor.VirtualDisplay.App", "TabletMonitor.VirtualDisplay.App\TabletMonitor.VirtualDisplay.App.vcxproj", "{922C1F44-4935-4CF2-81F4-6428615C68C1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5D6C371B-90B7-42A8-9B6D-1B76F2E1984A}.Debug|x64.ActiveCfg = Debug|x64
+		{5D6C371B-90B7-42A8-9B6D-1B76F2E1984A}.Debug|x64.Build.0 = Debug|x64
+		{5D6C371B-90B7-42A8-9B6D-1B76F2E1984A}.Release|x64.ActiveCfg = Release|x64
+		{5D6C371B-90B7-42A8-9B6D-1B76F2E1984A}.Release|x64.Build.0 = Release|x64
+		{922C1F44-4935-4CF2-81F4-6428615C68C1}.Debug|x64.ActiveCfg = Debug|x64
+		{922C1F44-4935-4CF2-81F4-6428615C68C1}.Debug|x64.Build.0 = Debug|x64
+		{922C1F44-4935-4CF2-81F4-6428615C68C1}.Release|x64.ActiveCfg = Release|x64
+		{922C1F44-4935-4CF2-81F4-6428615C68C1}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {14E77587-1B11-4C64-9823-E576AFD760B1}
+	EndGlobalSection
+EndGlobal
