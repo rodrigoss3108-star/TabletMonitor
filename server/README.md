@@ -6,14 +6,15 @@ os quadros ao aplicativo Android pelo protocolo TabletMonitor v1.
 ## Estado atual
 
 - Um tablet conectado por vez.
-- Captura do desktop completo.
+- Captura automática da primeira tela estendida que não seja a principal.
+- É possível escolher outra tela com o parâmetro `-Tela`.
 - H.264 com `libx264`, preset ultrafast e modo de baixa latência.
 - Resolução padrão de 1920 × 1200.
 - 30 FPS e bitrate de 12 Mbps.
 - Reconexão permitida após o tablet desconectar.
 
-Esta versão transmite o desktop existente. A criação de um monitor realmente
-estendido será implementada posteriormente com um Indirect Display Driver.
+Quando o driver `TabletMonitor Virtual Display` estiver ativo, o servidor
+transmite somente a área desse monitor para o tablet.
 
 ## Requisitos
 
@@ -41,6 +42,7 @@ No aplicativo Android, informe o IP do computador e a porta `5000`.
 Set-Location "D:\github\TabletMonitor\server"
 
 .\Start-TabletMonitorServer.ps1 `
+    -Tela 2 `
     -Porta 5000 `
     -Largura 1920 `
     -Altura 1200 `
@@ -48,4 +50,3 @@ Set-Location "D:\github\TabletMonitor\server"
     -BitrateKbps 12000 `
     -CaminhoFFmpeg "D:\TabletMonitor\tools\ffmpeg\bin\ffmpeg.exe"
 ```
-
