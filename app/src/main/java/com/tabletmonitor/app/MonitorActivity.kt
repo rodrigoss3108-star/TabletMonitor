@@ -34,7 +34,6 @@ class MonitorActivity : Activity(), SurfaceHolder.Callback {
         }
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        enterFullscreen()
 
         surfaceView = SurfaceView(this).apply {
             holder.addCallback(this@MonitorActivity)
@@ -72,6 +71,7 @@ class MonitorActivity : Activity(), SurfaceHolder.Callback {
         }
 
         setContentView(root)
+        root.post(::enterFullscreen)
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -158,4 +158,3 @@ class MonitorActivity : Activity(), SurfaceHolder.Callback {
         private const val STATUS_HIDE_DELAY_MS = 2_000L
     }
 }
-
