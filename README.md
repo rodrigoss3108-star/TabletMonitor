@@ -11,9 +11,9 @@ Windows. Esta primeira etapa implementa o receptor de vídeo do tablet.
 - Decodificação por hardware com `MediaCodec`.
 - Exibição em tela cheia e orientação horizontal.
 - Sem toque, S Pen, áudio ou controle remoto.
+- Servidor Windows em C# para capturar e transmitir o desktop com FFmpeg.
 
-O servidor e o driver de monitor virtual do Windows serão criados nas próximas
-etapas.
+O driver de monitor virtual do Windows será criado nas próximas etapas.
 
 ## Requisitos de desenvolvimento
 
@@ -51,6 +51,11 @@ parâmetros após qualquer alteração de resolução ou reinício do codificado
 
 ## Próxima etapa
 
-Criar o servidor Windows que gere um fluxo H.264 de teste. Depois disso será
-criado o Indirect Display Driver para que o Windows reconheça o tablet como um
-monitor estendido.
+Compilar e testar o aplicativo junto com o servidor Windows. Depois será criado
+o Indirect Display Driver para que o Windows reconheça o tablet como um monitor
+estendido.
+
+## Servidor Windows
+
+O código do servidor e as instruções de execução estão em
+[`server/README.md`](server/README.md).
