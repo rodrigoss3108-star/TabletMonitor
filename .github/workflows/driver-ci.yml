@@ -1,0 +1,254 @@
+name: Windows Virtual Display Driver
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "driver/**"
+      - ".github/workflows/driver-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build x64
+    runs-on: windows-2025-vs2026
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore WDK packages
+        shell: pwsh
+        run: |
+          nuget restore "driver\packages.config" `
+              -PackagesDirectory "driver\packages" `
+              -NonInteractive
+
+      - name: Build driver and host
+        shell: pwsh
+        run: |
+          msbuild "driver\TabletMonitor.VirtualDisplay.sln" `
+              /m `
+              /p:Configuration=Release `
+              /p:Platform=x64 `
+              /p:SignMode=Off `
+              /p:Inf2CatUseLocalTime=true
+
+      - name: Sign and assemble package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $ReleaseRoot = Join-Path $PWD "driver\x64\Release"
+          $Dist = Join-Path $PWD "driver\dist"
+
+          New-Item `
+              -ItemType Directory `
+              -Path $Dist `
+              -Force |
+              Out-Null
+
+          $Inf = Get-ChildItem `
+              -LiteralPath $ReleaseRoot `
+              -Filter "TabletMonitor.VirtualDisplay.inf" `
+              -File `
+              -Recurse |
+              Select-Object -First 1
+
+          if ($null -eq $Inf) {
+              throw "INF compilado não encontrado."
+          }
+
+          $PackageDirectory = $Inf.Directory.FullName
+          $Catalog = Get-ChildItem `
+              -LiteralPath $PackageDirectory `
+              -Filter "TabletMonitor.VirtualDisplay.cat" `
+              -File `
+              -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+
+          if ($null -eq $Catalog) {
+              $SearchRoots = @(
+                  (Join-Path $PWD "driver\packages"),
+                  "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+              ) |
+                  Where-Object { Test-Path -LiteralPath $_ }
+
+              $Inf2Cat = Get-ChildItem `
+                  -Path $SearchRoots `
+                  -Filter "Inf2Cat.exe" `
+                  -File `
+                  -Recurse `
+                  -ErrorAction SilentlyContinue |
+                  Sort-Object FullName -Descending |
+                  Select-Object -First 1
+
+              if ($null -eq $Inf2Cat) {
+                  throw "Inf2Cat.exe não encontrado."
+              }
+
+              & $Inf2Cat.FullName `
+                  "/driver:$PackageDirectory" `
+                  "/os:10_X64"
+
+              if ($LASTEXITCODE -ne 0) {
+                  throw "Inf2Cat falhou com o código $LASTEXITCODE."
+              }
+
+              $Catalog = Get-ChildItem `
+                  -LiteralPath $PackageDirectory `
+                  -Filter "TabletMonitor.VirtualDisplay.cat" `
+                  -File |
+                  Select-Object -First 1
+          }
+
+          if ($null -eq $Catalog) {
+              throw "Catálogo do driver não encontrado."
+          }
+
+          $SignToolSearchRoots = @(
+              (Join-Path $PWD "driver\packages"),
+              "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+          ) |
+              Where-Object { Test-Path -LiteralPath $_ }
+
+          $SignTool = Get-ChildItem `
+              -Path $SignToolSearchRoots `
+              -Filter "signtool.exe" `
+              -File `
+              -Recurse `
+              -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match "\\x64\\" } |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1
+
+          if ($null -eq $SignTool) {
+              throw "SignTool.exe x64 não encontrado."
+          }
+
+          $Certificate = New-SelfSignedCertificate `
+              -Type CodeSigningCert `
+              -Subject "CN=TabletMonitor Test Driver" `
+              -CertStoreLocation "Cert:\CurrentUser\My" `
+              -HashAlgorithm "SHA256" `
+              -KeyLength 2048 `
+              -KeyExportPolicy Exportable `
+              -NotAfter (Get-Date).AddYears(5)
+
+          $PasswordText = [Guid]::NewGuid().ToString("N")
+          $Password = ConvertTo-SecureString `
+              -String $PasswordText `
+              -AsPlainText `
+              -Force
+
+          $Pfx = Join-Path $env:RUNNER_TEMP "TabletMonitor-Test.pfx"
+          $Cer = Join-Path $Dist "TabletMonitor-Test.cer"
+
+          Export-PfxCertificate `
+              -Cert $Certificate `
+              -FilePath $Pfx `
+              -Password $Password |
+              Out-Null
+
+          Export-Certificate `
+              -Cert $Certificate `
+              -FilePath $Cer |
+              Out-Null
+
+          & $SignTool.FullName `
+              sign `
+              /v `
+              /fd SHA256 `
+              /f $Pfx `
+              /p $PasswordText `
+              $Catalog.FullName
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "A assinatura do catálogo falhou com o código $LASTEXITCODE."
+          }
+
+          Import-Certificate `
+              -FilePath $Cer `
+              -CertStoreLocation "Cert:\CurrentUser\Root" |
+              Out-Null
+
+          Import-Certificate `
+              -FilePath $Cer `
+              -CertStoreLocation "Cert:\CurrentUser\TrustedPublisher" |
+              Out-Null
+
+          & $SignTool.FullName `
+              verify `
+              /v `
+              /pa `
+              $Catalog.FullName
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "A verificação da assinatura falhou com o código $LASTEXITCODE."
+          }
+
+          $DriverFiles = Get-ChildItem `
+              -LiteralPath $PackageDirectory `
+              -File |
+              Where-Object {
+                  $_.Extension -in ".inf", ".cat", ".dll"
+              }
+
+          Copy-Item `
+              -LiteralPath $DriverFiles.FullName `
+              -Destination $Dist `
+              -Force
+
+          $Application = Get-ChildItem `
+              -LiteralPath $ReleaseRoot `
+              -Filter "TabletMonitor.VirtualDisplay.App.exe" `
+              -File `
+              -Recurse |
+              Select-Object -First 1
+
+          if ($null -eq $Application) {
+              throw "Aplicativo do monitor virtual não encontrado."
+          }
+
+          Copy-Item `
+              -LiteralPath $Application.FullName `
+              -Destination $Dist `
+              -Force
+
+          Copy-Item `
+              -LiteralPath "driver\Install-TabletMonitorVirtualDisplay.ps1" `
+              -Destination $Dist `
+              -Force
+
+          Copy-Item `
+              -LiteralPath "driver\README.md" `
+              -Destination $Dist `
+              -Force
+
+          Copy-Item `
+              -LiteralPath "driver\MS-PL.txt" `
+              -Destination $Dist `
+              -Force
+
+          Remove-Item `
+              -LiteralPath $Pfx `
+              -Force
+
+          Get-ChildItem `
+              -LiteralPath $Dist |
+              Select-Object Name, Length |
+              Format-Table -AutoSize
+
+      - name: Upload driver package
+        uses: actions/upload-artifact@v4
+        with:
+          name: TabletMonitor-VirtualDisplay-x64
+          path: driver/dist/
+          if-no-files-found: error
+          retention-days: 14
