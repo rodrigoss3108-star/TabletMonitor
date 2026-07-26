@@ -29,3 +29,11 @@ jobs:
 
       - name: Compilar APK de depuração
         run: gradle :app:assembleDebug --stacktrace
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: TabletMonitor-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
