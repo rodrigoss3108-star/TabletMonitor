@@ -37,7 +37,6 @@ class MonitorActivity : Activity(), SurfaceHolder.Callback {
 
         surfaceView = SurfaceView(this).apply {
             holder.addCallback(this@MonitorActivity)
-            setBackgroundColor(Color.BLACK)
         }
 
         statusView = TextView(this).apply {
